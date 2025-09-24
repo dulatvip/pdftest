@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Тест</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <h2>Тест</h2>
+  <label>Имя: <input id="first"></label>
+  <label>Фамилия: <input id="last"></label>
+  <label>Класс: <input id="class"></label>
+  <div id="doc_area" style="position:relative; margin-top:10px;"></div>
+  <button id="submit_btn">Отправить</button>
+  <pre id="res"></pre>
+
+  <script>
+    const templateId = "{{ template_id }}";
+  </script>
+  <script src="/static/js/student.js"></script>
+</body>
+</html>

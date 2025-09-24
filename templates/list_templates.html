@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Шаблоны</title></head>
+<body>
+  <h2>Шаблоны заданий</h2>
+  <a href="/editor">Открыть редактор</a>
+  <ul id="tpls"></ul>
+
+  <script>
+    async function load(){
+      const r = await fetch('/api/templates');
+      const arr = await r.json();
+      const ul = document.getElementById('tpls');
+      ul.innerHTML = '';
+      arr.forEach(t=>{
+        const li = document.createElement('li');
+        li.innerHTML = `${t.template_id} — <a href="/test/${t.template_id}" target="_blank">Открыть (для ученика)</a>`;
+        ul.appendChild(li);
+      });
+    }
+    load();
+  </script>
+</body>
+</html>

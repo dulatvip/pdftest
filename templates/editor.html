@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Редактор задания</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <h2>Редактор задания</h2>
+  <div>
+    <label>Template ID: <input id="template_id" placeholder="lesson_7"></label>
+    <label>Файл: <input type="file" id="file_input"></label>
+    <button id="upload_btn">Загрузить файл</button>
+  </div>
+
+  <div id="preview_area" style="position:relative; margin-top:10px;">
+    <div id="canvas_container"></div>
+  </div>
+
+  <div style="margin-top:10px;">
+    <button id="add_field">Добавить поле</button>
+    <button id="save_template">Сохранить шаблон</button>
+  </div>
+
+  <div>
+    <h3>Поля</h3>
+    <ul id="fields_list"></ul>
+  </div>
+  <div>
+  <button id="prev_page">← Назад</button>
+  <span id="page_info"></span>
+  <button id="next_page">Вперёд →</button>
+</div>
+
+
+  <script src="/static/js/editor.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+<script src="/static/js/editor.js"></script>
+</body>
+</html>
