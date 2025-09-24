@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtualenv
+venv/
+env/
+
+# Credentials (секретные ключи)
+credentials/*.json
+
+# Uploads
+uploads/*
+
+# Templates JSON (если не хотите хранить их в репо)
+templates_json/*
+
+# IDE
+.vscode/
+.idea/
