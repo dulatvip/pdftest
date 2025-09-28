@@ -12,9 +12,6 @@ credentials/*.json
 # Uploads
 uploads/*
 
-# Templates JSON (если не хотите хранить их в репо)
-templates_json/*
-
 # IDE
 .vscode/
 .idea/

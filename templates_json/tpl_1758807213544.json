@@ -1,0 +1,169 @@
+{
+  "classes": [
+    "11A",
+    "11B",
+    "11C"
+  ],
+  "fields": [
+    {
+      "h": 26,
+      "id": "field_1",
+      "page": 0,
+      "variants": [
+        "сжатие",
+        "архивация"
+      ],
+      "w": 653,
+      "x": 102,
+      "y": 188
+    },
+    {
+      "h": 30,
+      "id": "field_2",
+      "page": 0,
+      "variants": [
+        "архиваторы"
+      ],
+      "w": 498,
+      "x": 261,
+      "y": 241
+    },
+    {
+      "h": 25,
+      "id": "field_3",
+      "page": 0,
+      "variants": [
+        "rar",
+        "zip"
+      ],
+      "w": 201,
+      "x": 558,
+      "y": 276
+    },
+    {
+      "h": 25,
+      "id": "field_4",
+      "page": 0,
+      "variants": [
+        "тома"
+      ],
+      "w": 143,
+      "x": 222,
+      "y": 337
+    },
+    {
+      "h": 25,
+      "id": "field_5",
+      "page": 0,
+      "variants": [
+        "rar",
+        "7zip",
+        "arc"
+      ],
+      "w": 384,
+      "x": 381,
+      "y": 366
+    },
+    {
+      "h": 25,
+      "id": "field_6",
+      "page": 0,
+      "variants": [
+        "A"
+      ],
+      "w": 50,
+      "x": 167,
+      "y": 726
+    },
+    {
+      "h": 25,
+      "id": "field_7",
+      "page": 0,
+      "variants": [
+        "B"
+      ],
+      "w": 50,
+      "x": 230,
+      "y": 726
+    },
+    {
+      "h": 25,
+      "id": "field_8",
+      "page": 0,
+      "variants": [
+        "C"
+      ],
+      "w": 50,
+      "x": 297,
+      "y": 726
+    },
+    {
+      "h": 25,
+      "id": "field_9",
+      "page": 0,
+      "variants": [
+        "D"
+      ],
+      "w": 50,
+      "x": 367,
+      "y": 727
+    },
+    {
+      "checkable": true,
+      "h": 25,
+      "id": "field_1_1",
+      "page": 1,
+      "variants": [
+        "2000"
+      ],
+      "w": 95,
+      "x": 367,
+      "y": 147
+    },
+    {
+      "checkable": true,
+      "h": 25,
+      "id": "field_1_2",
+      "page": 1,
+      "variants": [
+        "1000"
+      ],
+      "w": 95,
+      "x": 368,
+      "y": 181
+    },
+    {
+      "checkable": true,
+      "h": 30,
+      "id": "field_1_3",
+      "page": 1,
+      "variants": [
+        "1000000"
+      ],
+      "w": 97,
+      "x": 367,
+      "y": 211
+    },
+    {
+      "checkable": true,
+      "h": 25,
+      "id": "field_1_4",
+      "page": 1,
+      "variants": [
+        "1"
+      ],
+      "w": 100,
+      "x": 365,
+      "y": 243
+    }
+  ],
+  "files": [
+    "7_1_3__page_1.png",
+    "7_1_3__page_2.png"
+  ],
+  "height": 1170,
+  "name": "7 class kz",
+  "sheet_url": "https://docs.google.com/spreadsheets/d/1HhUse8eizCFiGJcjfwwG3MXECmfqrR_LIR_aTCQ1kSg/edit?gid=0#gid=0",
+  "template_id": "tpl_1758807213544",
+  "width": 828
+}

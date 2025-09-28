@@ -1,40 +1,119 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <title>Редактор задания</title>
-  <link rel="stylesheet" href="/static/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор квизов</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/interact.js/1.10.11/interact.min.js"></script>
 </head>
 <body>
-  <h2>Редактор задания</h2>
-  <div>
-    <label>Template ID: <input id="template_id" placeholder="lesson_7"></label>
-    <label>Файл: <input type="file" id="file_input"></label>
-    <button id="upload_btn">Загрузить файл</button>
-  </div>
+    <div class="container">
+        <header class="header">
+            <h1>📝 Редактор интерактивных заданий</h1>
+            <p>Создавайте квизы из PDF документов с автоматической проверкой</p>
+        </header>
 
-  <div id="preview_area" style="position:relative; margin-top:10px;">
-    <div id="canvas_container"></div>
-  </div>
+        <div class="main-content">
+            <!-- Левая панель управления -->
+            <div class="sidebar">
+                <!-- Загрузка файла -->
+                <section>
+                    <h3>📁 Загрузка документа</h3>
+                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" class="input">
+                    <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Поддерживаемые форматы: PDF, PNG, JPG
+                    </p>
+                </section>
 
-  <div style="margin-top:10px;">
-    <button id="add_field">Добавить поле</button>
-    <button id="save_template">Сохранить шаблон</button>
-  </div>
+                <!-- Управление полями -->
+                <section>
+                    <h3>🔧 Управление полями</h3>
+                    <button id="addFieldBtn" class="btn" onclick="addField()" disabled>
+                        ➕ Добавить поле
+                    </button>
+                    <p style="margin: 10px 0; font-size: 14px;">
+                        Всего полей: <span id="fieldCount">0</span>
+                    </p>
+                </section>
 
-  <div>
-    <h3>Поля</h3>
-    <ul id="fields_list"></ul>
-  </div>
-  <div>
-  <button id="prev_page">← Назад</button>
-  <span id="page_info"></span>
-  <button id="next_page">Вперёд →</button>
-</div>
+                <!-- Свойства выбранного поля -->
+                <section>
+                    <div id="fieldProperties">
+                        <p style="color: #666; font-style: italic;">Выберите поле для редактирования</p>
+                    </div>
+                </section>
 
+                <!-- Настройки шаблона -->
+                <section>
+                    <h3>⚙️ Настройки шаблона</h3>
+                    
+                    <div class="form-group">
+                        <label for="templateName">Название шаблона:</label>
+                        <input type="text" id="templateName" class="input" placeholder="Введите название...">
+                    </div>
 
-  <script src="/static/js/editor.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
-<script src="/static/js/editor.js"></script>
+                    <div class="form-group">
+                        <label for="sheetUrl">Ссылка на Google Таблицу:</label>
+                        <input type="url" id="sheetUrl" class="input" placeholder="https://docs.google.com/spreadsheets/...">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="availableClasses">Доступные классы (через запятую):</label>
+                        <input type="text" id="availableClasses" class="input" placeholder="5А, 5Б, 6А...">
+                    </div>
+                </section>
+
+                <!-- Управление шаблонами -->
+                <section>
+                    <h3>💾 Шаблоны</h3>
+                    
+                    <div class="form-group">
+                        <label for="templateSelect">Загрузить шаблон:</label>
+                        <select id="templateSelect" class="select">
+                            <option value="">Выберите шаблон...</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="loadSelectedTemplate()" class="btn" style="width: 100%; margin-bottom: 10px;">
+                        📂 Загрузить
+                    </button>
+                    
+                    <button id="saveBtn" class="btn btn-large" onclick="saveTemplate()" disabled style="width: 100%;">
+                        💾 Сохранить шаблон
+                    </button>
+                </section>
+            </div>
+
+            <!-- Правая панель с документом -->
+            <div class="editor-area">
+                <!-- Навигация по страницам -->
+                <div id="pageNavigation" style="display: none; margin-bottom: 20px; text-align: center;">
+                    <button id="prevBtn" class="btn" onclick="prevPage()">⬅️ Предыдущая</button>
+                    <span id="pageInfo" style="margin: 0 20px; font-weight: bold;">1 / 1</span>
+                    <button id="nextBtn" class="btn" onclick="nextPage()">Следующая ➡️</button>
+                </div>
+
+                <!-- Область просмотра документа -->
+                <div id="documentViewer">
+                    <div class="placeholder" style="text-align: center; padding: 50px; color: #666;">
+                        <h3>📄 Загрузите документ для начала работы</h3>
+                        <p>Поддерживаемые форматы: PDF, PNG, JPG, JPEG</p>
+                        <p>После загрузки вы сможете добавлять интерактивные поля для ответов</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <p id="modalText">Сообщение</p>
+        </div>
+    </div>
+
+    <script src="/static/js/editor.js"></script>
 </body>
 </html>

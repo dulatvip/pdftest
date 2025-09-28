@@ -1,20 +1,35 @@
-# config_example.py
-import os
+class Config:
+    DEBUG = True
+    SECRET_KEY = "super-secret-key"
 
-# Путь к JSON-ключу сервисного аккаунта Google (установите этот путь в env GOOGLE_APPLICATION_CREDENTIALS или сюда)
-GOOGLE_CREDENTIALS_FILE = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "credentials/pdftest-473116-4b109bbff929.json")
+    SESSION_TIMEOUT_HOURS = 2  
 
-# ID Google Sheets (вставьте ваш ID)
-SHEET_ID = "1HhUse8eizCFiGJcjfwwG3MXECmfqrR_LIR_aTCQ1kSg"
+    UPLOAD_FOLDER = "uploads"
+    TEMPLATES_FOLDER = "templates_json"
+    STATIC_FOLDER = "static"
+    CREDENTIALS_FOLDER = "credentials"
 
-# Имя листа в таблице Google Sheets
-SHEET_NAME = "Sheet1"
+    PDF_DPI = 200
+    POPPLER_PATH = r"C:\Program Files\poppler-23.05.0\Library\bin"
 
-# Куда сохранять загруженные файлы и шаблоны
-UPLOAD_DIR = "uploads"
-TEMPLATES_DIR = "templates_json"
+    GOOGLE_SHEETS_SCOPES = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
 
-# Дополнительно: HOST/PORT (при локальном запуске)
-HOST = "0.0.0.0"
-PORT = 5000
-DEBUG = True
+    # 🔑 Вот эту переменную нужно обязательно прописать:
+    USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1yI_73HFTwXFuG2-2nwxqodoGCM0gDC6uDDp16t3aLa8/edit?gid=0#gid=0"
+
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+
+    @staticmethod
+    def create_directories():
+        import os
+        for folder in [Config.UPLOAD_FOLDER, Config.TEMPLATES_FOLDER, Config.STATIC_FOLDER, Config.CREDENTIALS_FOLDER]:
+            os.makedirs(folder, exist_ok=True)
+
+    @staticmethod
+    def check_credentials():
+        import os
+        creds_path = os.path.join(Config.CREDENTIALS_FOLDER, 'credentials.json')
+        return os.path.exists(creds_path)
