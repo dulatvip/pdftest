@@ -1,0 +1,10 @@
+{
+  "admin": {
+    "password": "admin123",
+    "days_left": 30
+  },
+  "demo": {
+    "password": "demo123",
+    "days_left": 7
+  }
+}

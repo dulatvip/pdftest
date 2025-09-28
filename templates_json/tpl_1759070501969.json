@@ -1,0 +1,46 @@
+{
+  "template_id": "tpl_1759070501969",
+  "name": "11 класс 7 урок",
+  "files": [
+    "8_1_4__2_page_1.png",
+    "8_1_4__2_page_2.png"
+  ],
+  "width": 1655,
+  "height": 2339,
+  "fields": [
+    {
+      "id": "field_0_1",
+      "page": 0,
+      "x": 529.9277389162561,
+      "y": 1960.283300696864,
+      "w": 244.58128078817734,
+      "h": 48.84435087108014,
+      "variants": [
+        "апап"
+      ],
+      "checkable": true
+    },
+    {
+      "id": "field_1_2",
+      "page": 1,
+      "x": 450.3377290640394,
+      "y": 1872.9342829268292,
+      "w": 244.58128078817734,
+      "h": 246.79954425087107,
+      "variants": [
+        "прпрпр"
+      ],
+      "checkable": true
+    }
+  ],
+  "sheet_url": "https://docs.google.com/spreadsheets/d/1HhUse8eizCFiGJcjfwwG3MXECmfqrR_LIR_aTCQ1kSg/edit?gid=0#gid=0",
+  "classes": [
+    "8A",
+    "8B",
+    "8C"
+  ],
+  "images_data": [
+    "8_1_4__2_page_1.png",
+    "8_1_4__2_page_2.png"
+  ]
+}

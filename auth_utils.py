@@ -3,7 +3,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from flask import session, redirect, url_for, request # Импортируем для декоратора
-from config import Config
+from config_0 import Config
 from functools import wraps
 
 class AuthManager:

@@ -11,7 +11,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import re
-from config import Config
+from config_0 import Config
 from auth_utils import auth_manager, login_required
 
 app = Flask(__name__)
