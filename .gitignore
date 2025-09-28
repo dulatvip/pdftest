@@ -11,6 +11,8 @@ credentials/*.json
 
 # Uploads
 uploads/*
+pdf1/*
+pdf2/*
 
 # IDE
 .vscode/

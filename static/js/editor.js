@@ -7,7 +7,8 @@ let currentTemplate = {
     height: 0,
     fields: [],
     sheet_url: '',
-    classes: []
+    classes: [],
+    images_data: [] // Добавим для явности, хотя в загружаемом шаблоне они будут
 };
 
 let currentPage = 0;
@@ -25,33 +26,84 @@ function setupEventListeners() {
     const fileInput = document.getElementById('fileInput');
     if (fileInput) fileInput.addEventListener('change', handleFileUpload);
 
-    // Клик вне поля — убираем выделение
     document.addEventListener('click', function (event) {
         if (!event.target.closest('.field') && !event.target.closest('#fieldProperties')) {
             clearFieldSelection();
         }
     });
+
+    const prevBtn = document.getElementById('prevBtn');
+    if (prevBtn) prevBtn.addEventListener('click', prevPage);
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn) nextBtn.addEventListener('click', nextPage);
+    const addFieldBtn = document.getElementById('addFieldBtn');
+    if (addFieldBtn) addFieldBtn.addEventListener('click', addField);
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveTemplate);
+    const loadTemplateBtn = document.getElementById('loadTemplateBtn');
+    if (loadTemplateBtn) loadTemplateBtn.addEventListener('click', loadSelectedTemplate);
 }
+
+
+/**
+ * Отрисовывает поля для текущей страницы, преобразуя PDF-координаты в экранные.
+ * Вызывается после загрузки изображения страницы.
+ */
+function drawFieldsForEditor(pageIndex) {
+    const pageContainer = document.getElementById(`page-${pageIndex}`);
+    if (!pageContainer) return;
+
+    // Удаляем все существующие поля, чтобы избежать дублирования
+    pageContainer.querySelectorAll('.field').forEach(el => el.remove());
+
+    const img = pageContainer.querySelector('img');
+    if (!img) return;
+
+    const pageData = currentTemplate.images_data?.[pageIndex];
+    // Используем page_width/page_height из images_data (PDF points)
+    const pdfW = pageData?.page_width || img.naturalWidth;
+    const pdfH = pageData?.page_height || img.naturalHeight;
+
+    // Вычисляем коэффициент масштабирования: пиксели экрана / PDF points
+    const scaleX = img.clientWidth / pdfW;
+    const scaleY = img.clientHeight / pdfH;
+
+    currentTemplate.fields
+        .filter(f => f.page === pageIndex)
+        .forEach(f => {
+            // f.x, f.y, f.w, f.h - это "чистые" PDF points
+
+            // 1. Инвертируем Y: из PDF-координат (Y_bottom) в веб-координаты (Y_top)
+            // (WEB_Y_points = PDF_HEIGHT - PDF_Y - FIELD_HEIGHT)
+            const webPointsY = pdfH - f.y - f.h;
+
+            // 2. Преобразуем PDF points в экранные пиксели
+            const screenX = f.x * scaleX;
+            const screenY = webPointsY * scaleY;
+            const screenW = f.w * scaleX;
+            const screenH = f.h * scaleY;
+
+            // Создаем и размещаем элемент
+            const field = createFieldElement(f.id, 'text'); // Предполагаем 'text' или передавайте f.type
+            field.style.left = screenX + 'px';
+            field.style.top = screenY + 'px';
+            field.style.width = screenW + 'px';
+            field.style.height = screenH + 'px';
+
+            pageContainer.appendChild(field);
+            makeFieldInteractive(field); // Делаем поле интерактивным
+        });
+}
+
 
 function setupModal() {
     const modal = document.getElementById('modal');
     const closeBtn = document.querySelector('.close');
-
-    if (closeBtn) {
-        closeBtn.onclick = function () {
-            modal.style.display = 'none';
-        };
-    }
-
-    window.onclick = function (event) {
-        if (event.target === modal) {
-            modal.style.display = 'none';
-        }
-    };
+    if (closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
+    window.onclick = event => { if (event.target === modal) modal.style.display = 'none'; };
 }
 
 function showModal(message) {
-    console.log('Modal message:', message);
     const modalText = document.getElementById('modalText');
     const modal = document.getElementById('modal');
     if (modalText && modal) {
@@ -72,27 +124,49 @@ async function handleFileUpload(event) {
     formData.append('file', file);
 
     try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
+        const response = await fetch('/upload', { method: 'POST', body: formData });
         const result = await response.json();
 
         if (result.success) {
+            
+            if (!result.files || result.files.length === 0) {
+                 showModal('Ошибка: Файл загружен, но страницы документа не были сгенерированы. Проверьте, что файл не поврежден или не защищен паролем.');
+                 return;
+            }
+            
+            const firstFile = result.files[0];
+            
+            // --- ИСПРАВЛЕНИЕ ЛОГИКИ ОПРЕДЕЛЕНИЯ ИМЕН ФАЙЛОВ ---
+            let fileNames;
+            if (typeof firstFile === 'string') {
+                // Если элемент - это строка (прямое имя файла)
+                fileNames = result.files;
+            } else if (firstFile.filename) {
+                // Если элемент - это объект (ожидаемый формат)
+                fileNames = result.files.map(d => d.filename);
+            } else {
+                showModal('Ошибка: Неизвестный формат данных о файлах от сервера.');
+                return;
+            }
+            // ----------------------------------------------------
+            
             currentTemplate = {
                 template_id: '',
                 name: '',
-                files: result.files,
-                width: 0,
-                height: 0,
+                files: fileNames, // Используем очищенный массив имен файлов
+                
+                // Используем данные первого файла, предполагая, что это объект
+                width: firstFile.width || 0, 
+                height: firstFile.height || 0, 
+                
                 fields: [],
                 sheet_url: '',
-                classes: []
+                classes: [],
+                images_data: result.files
             };
+            
             currentPage = 0;
-            fieldCounter = 0; // Сбрасываем счетчик для нового документа
-
+            fieldCounter = 0;
             loadDocument();
             enableEditingControls();
             clearForm();
@@ -115,17 +189,13 @@ function clearForm() {
 function loadDocument() {
     const viewer = document.getElementById('documentViewer');
     if (!viewer) return;
-
     viewer.innerHTML = '';
 
     if (!currentTemplate.files || currentTemplate.files.length === 0) {
         viewer.innerHTML = '<div class="placeholder">Файлы документа не найдены</div>';
         return;
     }
-
-    if (currentPage >= currentTemplate.files.length) {
-        currentPage = 0;
-    }
+    if (currentPage >= currentTemplate.files.length) currentPage = 0;
 
     const pageDiv = document.createElement('div');
     pageDiv.className = 'document-page';
@@ -134,20 +204,24 @@ function loadDocument() {
 
     const img = document.createElement('img');
     img.src = `/uploads/${currentTemplate.files[currentPage]}`;
+    
+    // !!! ГЛАВНОЕ ИСПРАВЛЕНИЕ: Отрисовка полей после загрузки изображения !!!
     img.onload = function () {
+        // Обновляем текущие размеры в глобальных переменных (используются при создании поля)
         currentTemplate.width = this.naturalWidth;
         currentTemplate.height = this.naturalHeight;
-        loadFieldsForCurrentPage();
+        
+        // Пересчитываем и отрисовываем поля из PDF-координат в пиксели
+        drawFieldsForEditor(currentPage);
     };
-
-    img.onerror = function () {
-        pageDiv.innerHTML = '<div class="placeholder">Ошибка загрузки изображения</div>';
-    };
+    img.onerror = () => pageDiv.innerHTML = '<div class="placeholder">Ошибка загрузки изображения</div>';
 
     pageDiv.appendChild(img);
     viewer.appendChild(pageDiv);
-
     updatePageNavigation();
+    
+    // Снимаем выделение, чтобы обновились свойства полей
+    clearFieldSelection();
 }
 
 function updatePageNavigation() {
@@ -155,7 +229,6 @@ function updatePageNavigation() {
     const pageInfo = document.getElementById('pageInfo');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
-
     if (!nav || !pageInfo || !prevBtn || !nextBtn) return;
 
     if (currentTemplate.files && currentTemplate.files.length > 1) {
@@ -163,16 +236,14 @@ function updatePageNavigation() {
         pageInfo.textContent = `${currentPage + 1} / ${currentTemplate.files.length}`;
         prevBtn.disabled = currentPage === 0;
         nextBtn.disabled = currentPage === currentTemplate.files.length - 1;
-    } else {
-        nav.style.display = 'none';
-    }
+    } else nav.style.display = 'none';
 }
 
 function prevPage() {
     if (currentPage > 0) {
         saveCurrentPagePositions();
         currentPage--;
-        loadDocument();
+        loadDocument(); // loadDocument теперь отвечает за отрисовку новой страницы
     }
 }
 
@@ -180,21 +251,48 @@ function nextPage() {
     if (currentPage < currentTemplate.files.length - 1) {
         saveCurrentPagePositions();
         currentPage++;
-        loadDocument();
+        loadDocument(); // loadDocument теперь отвечает за отрисовку новой страницы
     }
 }
 
+
 function saveCurrentPagePositions() {
     const pageFields = currentTemplate.fields.filter(f => f.page === currentPage);
+    const img = document.querySelector(`#page-${currentPage} img`);
+    if (!img) return;
+
+    // Получаем данные о странице для вычисления PDF-координат
+    const pageData = currentTemplate.images_data?.[currentPage];
+    const pdfW = pageData?.page_width || currentTemplate.width;
+    const pdfH = pageData?.page_height || currentTemplate.height;
+    const zoom = pageData?.zoom || 1;
+
+    // Вычисляем масштаб преобразования экранных пикселей в PDF points
+    const scaleFactorX = (pdfW) / img.clientWidth;
+    const scaleFactorY = (pdfH) / img.clientHeight;
 
     pageFields.forEach(fieldData => {
         const fieldElement = document.getElementById(fieldData.id);
         if (fieldElement) {
             const computedStyle = window.getComputedStyle(fieldElement);
-            fieldData.x = parseInt(computedStyle.left) || fieldData.x;
-            fieldData.y = parseInt(computedStyle.top) || fieldData.y;
-            fieldData.w = parseInt(computedStyle.width) || fieldData.w;
-            fieldData.h = parseInt(computedStyle.height) || fieldData.h;
+            const screenX = parseFloat(computedStyle.left) || 0;
+            const screenY = parseFloat(computedStyle.top) || 0;
+            const screenW = parseFloat(computedStyle.width) || 0;
+            const screenH = parseFloat(computedStyle.height) || 0;
+
+            // Преобразуем экранные пиксели в "чистые" PDF points
+            const pdfPointsX = screenX * scaleFactorX;
+            const pdfPointsY = screenY * scaleFactorY;
+            const pdfPointsW = screenW * scaleFactorX;
+            const pdfPointsH = screenH * scaleFactorY;
+            
+            // Инвертируем Y: из веб-координат (Y_top) в PDF-координаты (Y_bottom)
+            // (PDF_Y = PDF_HEIGHT - WEB_Y - FIELD_HEIGHT)
+            fieldData.x = pdfPointsX;
+            fieldData.w = pdfPointsW;
+            fieldData.h = pdfPointsH;
+            // PDF-координата Y поля - это Y его нижней границы
+            fieldData.y = pdfH - pdfPointsY - pdfPointsH; 
         }
     });
 }
@@ -206,41 +304,51 @@ function enableEditingControls() {
     });
 }
 
-// Функция для обновления счетчика полей на основе существующих
+// ==================== Управление полями ====================
+
 function updateFieldCounter() {
     let maxCounter = 0;
-    
     currentTemplate.fields.forEach(field => {
-        // Извлекаем номер из ID поля (формат: field_page_counter)
         const match = field.id.match(/field_(\d+)_(\d+)/);
-        if (match) {
-            const counter = parseInt(match[2]);
-            maxCounter = Math.max(maxCounter, counter);
-        }
+        if (match) maxCounter = Math.max(maxCounter, parseInt(match[2]));
     });
-    
     fieldCounter = maxCounter;
-    console.log(`Установлен fieldCounter: ${fieldCounter} (найдено ${currentTemplate.fields.length} полей)`);
 }
 
-// Функция для генерации уникального ID поля
 function generateUniqueFieldId(page) {
     let newId;
     let attempts = 0;
-    
     do {
         fieldCounter++;
         newId = `field_${page}_${fieldCounter}`;
         attempts++;
-        
-        // Защита от бесконечного цикла
-        if (attempts > 1000) {
-            newId = `field_${page}_${Date.now()}`;
-            break;
-        }
+        if (attempts > 1000) { newId = `field_${page}_${Date.now()}`; break; }
     } while (currentTemplate.fields.some(f => f.id === newId));
-    
     return newId;
+}
+
+function createFieldElement(id, type = 'text') {
+     const fieldContainer = document.createElement('div');
+     fieldContainer.className = 'field editor-field';
+     fieldContainer.id = id;
+     fieldContainer.style.border = '1px dashed #999';
+     fieldContainer.style.position = 'absolute';
+     fieldContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.7)'; // Сделаем полупрозрачным
+
+     const input = document.createElement('input');
+     input.type = type;
+     input.placeholder = 'Введите ответ...';
+     input.style.width = '100%';
+     input.style.height = '100%';
+     input.style.border = 'none';
+     input.style.outline = 'none';
+     input.style.padding = '2px';
+     input.style.boxSizing = 'border-box';
+     input.style.pointerEvents = 'none'; // Чтобы можно было кликнуть на div для interact.js
+     fieldContainer.appendChild(input);
+
+     fieldContainer.addEventListener('click', e => { e.stopPropagation(); selectField(fieldContainer); });
+     return fieldContainer;
 }
 
 function addField() {
@@ -248,66 +356,65 @@ function addField() {
         showModal('Сначала загрузите документ');
         return;
     }
+    
+    // Обязательно сохраняем текущие позиции перед добавлением нового
+    saveCurrentPagePositions();
 
-    // Генерируем уникальный ID
     const fieldId = generateUniqueFieldId(currentPage);
-
-    const field = document.createElement('div');
-    field.className = 'field';
-    field.id = fieldId;
-    field.style.left = '50px';
-    field.style.top = '50px';
-    field.style.width = '150px';
-    field.style.height = '30px';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.placeholder = 'Введите ответ...';
-    input.style.pointerEvents = 'none'; // отключаем для редактора
-    field.appendChild(input);
-
-    field.addEventListener('click', (e) => {
-        e.stopPropagation();
-        selectField(field);
-    });
+    
+    // Используем центральную позицию для нового поля, переведенную в PDF-координаты.
+    // Для простоты, пока просто используем фиксированные пиксели, но лучше бы пересчитывать
+    const initialScreenX = 50;
+    const initialScreenY = 50;
+    const initialScreenW = 150;
+    const initialScreenH = 30;
+    
+    // Временно создаем элемент, чтобы получить его и установить стили
+    const fieldContainer = createFieldElement(fieldId, 'text');
+    fieldContainer.style.left = initialScreenX + 'px';
+    fieldContainer.style.top = initialScreenY + 'px';
+    fieldContainer.style.width = initialScreenW + 'px';
+    fieldContainer.style.height = initialScreenH + 'px';
 
     const page = document.getElementById(`page-${currentPage}`);
-    if (page) {
-        page.appendChild(field);
-        makeFieldInteractive(field);
-    }
+    if (page) { page.appendChild(fieldContainer); makeFieldInteractive(fieldContainer); }
 
-    const fieldData = {
-        id: fieldId,
-        page: currentPage,
-        x: 50,
-        y: 50,
-        w: 150,
-        h: 30,
-        variants: [],
-        checkable: true
-    };
-
-    currentTemplate.fields.push(fieldData);
-    updateFieldCount();
-    selectField(field);
+    // Добавляем поле в данные. Его PDF-координаты будут корректно сохранены
+    // при следующем вызове saveCurrentPagePositions.
+    currentTemplate.fields.push({ 
+        id: fieldId, 
+        page: currentPage, 
+        x: 0, y: 0, w: 0, h: 0, // Временно 0, будет обновлено в saveCurrentPagePositions
+        variants: [], 
+        checkable: true 
+    });
     
-    console.log(`Добавлено поле: ${fieldId}`);
+    // Сразу сохраняем, чтобы получить правильные PDF-координаты
+    saveCurrentPagePositions(); 
+    
+    updateFieldCount();
+    selectField(fieldContainer);
 }
 
+// Обновленная интерактивность
 function makeFieldInteractive(field) {
     interact(field)
         .draggable({
             listeners: {
                 move(event) {
                     const target = event.target;
-                    const left = (parseInt(target.style.left) || 0) + event.dx;
-                    const top = (parseInt(target.style.top) || 0) + event.dy;
+                    const left = (parseFloat(target.style.left) || 0) + event.dx;
+                    const top = (parseFloat(target.style.top) || 0) + event.dy;
                     target.style.left = left + 'px';
                     target.style.top = top + 'px';
-                    updateFieldPosition(target.id, left, top);
+                    // Не обновляем PDF-координаты напрямую, а ждем saveCurrentPagePositions
+                    // updateFieldPosition(target.id, left, top); 
+                    
+                    // Обновляем sidebar, чтобы видеть изменения
+                    if (selectedField?.id === target.id) showFieldProperties(target); 
                 }
-            }
+            },
+            onend: () => saveCurrentPagePositions() // Сохраняем после перетаскивания
         })
         .resizable({
             edges: { right: true, bottom: true },
@@ -316,22 +423,24 @@ function makeFieldInteractive(field) {
                     const target = event.target;
                     const w = event.rect.width;
                     const h = event.rect.height;
-                    const left = parseInt(target.style.left) + event.deltaRect.left;
-                    const top = parseInt(target.style.top) + event.deltaRect.top;
+                    const left = (parseFloat(target.style.left) || 0) + event.deltaRect.left;
+                    const top = (parseFloat(target.style.top) || 0) + event.deltaRect.top;
+                    
                     target.style.width = w + 'px';
                     target.style.height = h + 'px';
                     target.style.left = left + 'px';
                     target.style.top = top + 'px';
-                    updateFieldSize(target.id, w, h, left, top);
+                    
+                    // Обновляем sidebar, чтобы видеть изменения
+                    if (selectedField?.id === target.id) showFieldProperties(target); 
                 }
-            }
+            },
+            onend: () => saveCurrentPagePositions() // Сохраняем после изменения размера
         });
 }
 
 function selectField(field) {
-    // Убираем выделение со всех полей
     document.querySelectorAll('.field').forEach(f => f.classList.remove('selected'));
-    
     selectedField = field;
     if (field) {
         field.classList.add('selected');
@@ -348,128 +457,42 @@ function clearFieldSelection() {
 
 function showFieldProperties(field) {
     const sidebar = document.getElementById('fieldProperties');
-    if (!sidebar) {
-        console.error('Элемент #fieldProperties не найден в DOM');
-        return;
-    }
-
-    sidebar.innerHTML = '';
-
-    const title = document.createElement('h3');
-    title.textContent = 'Свойства поля';
-    sidebar.appendChild(title);
-
-    // Найдем данные поля в currentTemplate.fields
+    if (!sidebar) return;
     const fieldData = currentTemplate.fields.find(f => f.id === field.id);
+    if (!fieldData) return;
     
-    const label = document.createElement('label');
-    label.textContent = 'Правильные ответы (каждый с новой строки):';
-    sidebar.appendChild(label);
+    // Для отображения в сайдбаре используем сохраненные PDF-координаты
+    const x = fieldData.x ? fieldData.x.toFixed(2) : 'N/A';
+    const y = fieldData.y ? fieldData.y.toFixed(2) : 'N/A';
+    const w = fieldData.w ? fieldData.w.toFixed(2) : 'N/A';
+    const h = fieldData.h ? fieldData.h.toFixed(2) : 'N/A';
 
-    const variantsInput = document.createElement('textarea');
-    variantsInput.style.width = '100%';
-    variantsInput.style.height = '100px';
-    variantsInput.style.marginBottom = '10px';
-    variantsInput.style.padding = '5px';
-    variantsInput.style.border = '1px solid #ddd';
-    variantsInput.style.borderRadius = '3px';
-    
-    // Заполняем текущие варианты
-    if (fieldData && fieldData.variants && fieldData.variants.length > 0) {
-        variantsInput.value = fieldData.variants.join('\n');
-    }
-    
-    variantsInput.placeholder = 'Введите варианты ответов (каждый с новой строки)';
-    
-    // Автосохранение при потере фокуса
-    variantsInput.addEventListener('blur', function() {
-        const newVariants = variantsInput.value
-            .split('\n')
-            .map(v => v.trim())
-            .filter(v => v !== '');
-
-        // Обновляем данные в currentTemplate.fields
-        if (fieldData) {
-            const oldVariants = fieldData.variants ? fieldData.variants.slice() : [];
-            fieldData.variants = newVariants;
-            
-            // Показываем визуальную обратную связь только если данные изменились
-            if (JSON.stringify(oldVariants) !== JSON.stringify(newVariants)) {
-                // Временно меняем стиль для показа сохранения
-                const originalBorder = variantsInput.style.border;
-                variantsInput.style.border = '2px solid #27ae60';
-                variantsInput.style.backgroundColor = '#d5f4e6';
-                
-                setTimeout(() => {
-                    variantsInput.style.border = originalBorder;
-                    variantsInput.style.backgroundColor = '';
-                }, 800);
-                
-                console.log(`Автосохранение для поля ${field.id}: ${newVariants.length} вариантов`);
-            }
-        }
-    });
-    
-    sidebar.appendChild(variantsInput);
-
-    const updateBtn = document.createElement('button');
-    updateBtn.textContent = 'Обновить данные';
-    updateBtn.className = 'btn';
-    updateBtn.style.width = '100%';
-    updateBtn.style.marginBottom = '10px';
-    
-    updateBtn.onclick = () => {
-        const newVariants = variantsInput.value
-            .split('\n')
-            .map(v => v.trim())
-            .filter(v => v !== '');
-
-        // Обновляем данные в currentTemplate.fields
-        if (fieldData) {
-            const oldVariants = fieldData.variants ? fieldData.variants.slice() : [];
-            fieldData.variants = newVariants;
-            
-            // Показываем визуальную обратную связь
-            const originalBackground = updateBtn.style.backgroundColor;
-            updateBtn.style.backgroundColor = '#27ae60';
-            updateBtn.textContent = 'Сохранено ✅';
-            
-            setTimeout(() => {
-                updateBtn.style.backgroundColor = originalBackground;
-                updateBtn.textContent = 'Обновить данные';
-            }, 1500);
-            
-            console.log(`Ручное сохранение для поля ${field.id}: ${newVariants.length} вариантов`);
-        }
-    };
-    sidebar.appendChild(updateBtn);
-
-    // Кнопка удаления поля
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'Удалить поле';
-    deleteBtn.className = 'btn btn-danger';
-    deleteBtn.style.width = '100%';
-    
-    deleteBtn.onclick = () => {
-        deleteField();
-    };
-    sidebar.appendChild(deleteBtn);
-
-    // Информация о поле
-    const info = document.createElement('div');
-    info.style.marginTop = '15px';
-    info.style.fontSize = '12px';
-    info.style.color = '#666';
-    info.innerHTML = `
-        <strong>ID:</strong> ${field.id}<br>
-        <strong>Страница:</strong> ${(fieldData ? fieldData.page + 1 : 'N/A')}<br>
-        <strong>Позиция:</strong> x:${fieldData ? fieldData.x : 0}, y:${fieldData ? fieldData.y : 0}<br>
-        <strong>Размер:</strong> ${fieldData ? fieldData.w : 0}×${fieldData ? fieldData.h : 0}
+    sidebar.innerHTML = `
+        <h3>Свойства поля</h3>
+        <label>Правильные ответы (каждый с новой строки):</label>
+        <textarea id="fieldVariants" style="width:100%; height:100px; margin-bottom:10px; padding:5px; border:1px solid #ddd; border-radius:3px;">
+${fieldData.variants.join('\n')}
+        </textarea>
+        <button id="updateFieldBtn" class="btn" style="width:100%; margin-bottom:10px;">Обновить данные</button>
+        <button id="deleteFieldBtn" class="btn btn-danger" style="width:100%;">Удалить поле</button>
+        <div style="margin-top:15px; font-size:12px; color:#666;">
+            <strong>ID:</strong> ${fieldData.id}<br>
+            <strong>Страница:</strong> ${fieldData.page + 1}<br>
+            <strong>Позиция (PDF points):</strong> x:${x}, y:${y}<br>
+            <strong>Размер (PDF points):</strong> ${w}×${h}
+        </div>
     `;
-    sidebar.appendChild(info);
-}
 
-// ==================== CRUD для полей ====================
+    document.getElementById('fieldVariants').addEventListener('blur', () => {
+        fieldData.variants = document.getElementById('fieldVariants').value
+            .split('\n').map(v => v.trim()).filter(v => v);
+    });
+    document.getElementById('updateFieldBtn').onclick = () => {
+        fieldData.variants = document.getElementById('fieldVariants').value
+            .split('\n').map(v => v.trim()).filter(v => v);
+    };
+    document.getElementById('deleteFieldBtn').onclick = () => deleteField();
+}
 
 function deleteField() {
     if (!selectedField) return;
@@ -482,47 +505,9 @@ function deleteField() {
     }
 }
 
-function updateFieldPosition(id, x, y) {
-    const f = currentTemplate.fields.find(f => f.id === id);
-    if (f) { f.x = x; f.y = y; }
-}
+// Функции updateFieldPosition/Size удалены, т.к. теперь все сохраняется через saveCurrentPagePositions
+// Это упрощает логику и гарантирует, что координаты всегда сохраняются в PDF points.
 
-function updateFieldSize(id, w, h, x, y) {
-    const f = currentTemplate.fields.find(f => f.id === id);
-    if (f) { f.w = w; f.h = h; f.x = x; f.y = y; }
-}
-
-function loadFieldsForCurrentPage() {
-    document.querySelectorAll('.field').forEach(field => field.remove());
-    const pageFields = currentTemplate.fields.filter(f => f.page === currentPage);
-
-    pageFields.forEach(fd => {
-        const field = document.createElement('div');
-        field.className = 'field';
-        field.id = fd.id;
-        field.style.left = fd.x + 'px';
-        field.style.top = fd.y + 'px';
-        field.style.width = fd.w + 'px';
-        field.style.height = fd.h + 'px';
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.placeholder = 'Введите ответ...';
-        input.style.pointerEvents = 'none'; // отключаем для редактора
-        field.appendChild(input);
-
-        field.addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectField(field);
-        });
-
-        const page = document.getElementById(`page-${currentPage}`);
-        if (page) {
-            page.appendChild(field);
-            makeFieldInteractive(field);
-        }
-    });
-}
 
 function updateFieldCount() {
     const el = document.getElementById('fieldCount');
@@ -533,29 +518,19 @@ function updateFieldCount() {
 
 async function saveTemplate() {
     const templateName = document.getElementById('templateName');
-    if (!templateName || !templateName.value.trim()) {
-        showModal('Введите название шаблона');
-        return;
-    }
-    if (currentTemplate.fields.length === 0) {
-        showModal('Добавьте хотя бы одно поле');
-        return;
-    }
-    const noAnswers = currentTemplate.fields.filter(f => f.checkable && (!f.variants || f.variants.length === 0));
-    if (noAnswers.length > 0) {
-        showModal('У некоторых проверяемых полей нет правильных ответов');
-        return;
-    }
+    if (!templateName || !templateName.value.trim()) { showModal('Введите название шаблона'); return; }
+    if (currentTemplate.fields.length === 0) { showModal('Добавьте хотя бы одно поле'); return; }
 
+    const noAnswers = currentTemplate.fields.filter(f => f.checkable && (!f.variants || f.variants.length === 0));
+    if (noAnswers.length > 0) { showModal('У некоторых проверяемых полей нет правильных ответов'); return; }
+
+    // Сохраняем позиции перед отправкой
     saveCurrentPagePositions();
 
     currentTemplate.name = templateName.value.trim();
-    const sheetUrl = document.getElementById('sheetUrl');
-    currentTemplate.sheet_url = sheetUrl ? sheetUrl.value.trim() : '';
-    const classesEl = document.getElementById('availableClasses');
-    currentTemplate.classes = classesEl && classesEl.value.trim()
-        ? classesEl.value.split(',').map(c => c.trim())
-        : [];
+    currentTemplate.sheet_url = (document.getElementById('sheetUrl')?.value || '').trim();
+    currentTemplate.classes = document.getElementById('availableClasses')?.value
+        .split(',').map(c => c.trim()) || [];
 
     if (!currentTemplate.template_id) currentTemplate.template_id = `tpl_${Date.now()}`;
 
@@ -566,12 +541,9 @@ async function saveTemplate() {
             body: JSON.stringify(currentTemplate)
         });
         const result = await response.json();
-        if (result.success) {
-            showModal('Шаблон сохранен успешно');
-            loadTemplateList();
-        } else {
-            showModal('Ошибка сохранения: ' + result.error);
-        }
+        if (result.success) showModal('Шаблон сохранен успешно');
+        else showModal('Ошибка сохранения: ' + result.error);
+        loadTemplateList();
     } catch (err) {
         showModal('Ошибка: ' + err.message);
     }
@@ -598,22 +570,16 @@ async function loadTemplateList() {
 
 async function loadSelectedTemplate() {
     const select = document.getElementById('templateSelect');
-    if (!select) return;
-    const id = select.value;
-    if (!id) {
-        showModal('Выберите шаблон');
-        return;
-    }
+    if (!select || !select.value) { showModal('Выберите шаблон'); return; }
     try {
-        const response = await fetch(`/load_template/${id}`);
+        const response = await fetch(`/load_template/${select.value}`);
         const template = await response.json();
         if (response.ok) {
             currentTemplate = template;
             currentPage = 0;
-            
-            // Обновляем fieldCounter на основе существующих полей
             updateFieldCounter();
             
+            // Обновляем поля ввода
             ['templateName', 'sheetUrl', 'availableClasses'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
@@ -622,17 +588,15 @@ async function loadSelectedTemplate() {
                     if (id === 'availableClasses') el.value = (template.classes || []).join(', ');
                 }
             });
-            if (template.files && template.files.length > 0) {
-                loadDocument();
-                enableEditingControls();
-            } else {
-                showModal('В шаблоне нет файлов');
+            
+            // Загружаем документ, который после загрузки изображения сам отрисует поля
+            if (template.files?.length > 0) { 
+                loadDocument(); 
+                enableEditingControls(); 
             }
+            else showModal('В шаблоне нет файлов');
             updateFieldCount();
-            showModal('Шаблон загружен успешно');
-        } else {
-            showModal('Ошибка загрузки: ' + (template.error || 'Неизвестная'));
-        }
+        } else showModal('Ошибка загрузки: ' + (template.error || 'Неизвестная'));
     } catch (err) {
         showModal('Ошибка: ' + err.message);
     }

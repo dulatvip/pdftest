@@ -199,9 +199,10 @@ function loadTestDocument() {
     pageDiv.appendChild(img);
     viewer.appendChild(pageDiv);
 }
+
 function renderFieldsForPage(pageIndex) {
     const viewer = document.getElementById('documentViewer');
-    viewer.innerHTML = '';
+    viewer.innerHTML = ''; // очищаем перед загрузкой
 
     const page = document.createElement('div');
     page.className = 'document-page';
@@ -210,59 +211,70 @@ function renderFieldsForPage(pageIndex) {
     const img = document.createElement('img');
     img.src = `/uploads/${currentTemplate.files[pageIndex]}`;
     img.style.width = '100%';
+    img.style.display = 'block';
 
     img.onload = function() {
         drawFields(page, img, pageIndex);
-        // При изменении размера окна пересчитываем поля
-        window.addEventListener('resize', () => {
-            drawFields(page, img, pageIndex);
-        });
     };
 
     page.appendChild(img);
     viewer.appendChild(page);
+
+    // Обработчик resize один раз
+    if (!window.fieldResizeListenerAdded) {
+        window.addEventListener('resize', () => drawFields(page, img, pageIndex));
+        window.fieldResizeListenerAdded = true;
+    }
 }
+
 
 function drawFields(page, img, pageIndex) {
     // Убираем старые поля
     page.querySelectorAll('.student-field-wrapper').forEach(el => el.remove());
 
-    const originalW = currentTemplate.width;
-    const originalH = currentTemplate.height;
+    // Берем размеры из PDF (в points) и зум
+    const pageData = currentTemplate.images_data?.[pageIndex];
+    const pdfW = pageData?.page_width || currentTemplate.width;
+    const pdfH = pageData?.page_height || currentTemplate.height;
+    const zoom = pageData?.zoom || 1;
 
-    const scaleX = img.clientWidth / originalW;
-    const scaleY = img.clientHeight / originalH;
+    // Вычисляем коэффициент масштабирования: пиксели экрана / PDF points
+    const scaleX = img.clientWidth / pdfW;
+    const scaleY = img.clientHeight / pdfH;
 
     currentTemplate.fields
-        .filter(f => f.page === pageIndex) // строго только текущая страница
+        .filter(f => f.page === pageIndex)
         .forEach(f => {
+            // f.x, f.y, f.w, f.h теперь должны быть "чистыми" PDF points
+
+            // 1. Инвертируем Y: из PDF-координат (Y_bottom) в веб-координаты (Y_top)
+            // (WEB_Y = PDF_HEIGHT - PDF_Y - FIELD_HEIGHT)
+            const webPointsY = pdfH - f.y - f.h;
+
+            // 2. Преобразуем PDF points в экранные пиксели
+            const screenX = f.x * scaleX;
+            const screenY = webPointsY * scaleY;
+            const screenW = f.w * scaleX;
+            const screenH = f.h * scaleY;
+
             const wrapper = document.createElement('div');
             wrapper.className = 'student-field-wrapper';
-            wrapper.style.left = (f.x * scaleX) + 'px';
-            wrapper.style.top = (f.y * scaleY) + 'px';
-            wrapper.style.width = (f.w * scaleX) + 'px';
-            wrapper.style.height = (f.h * scaleY) + 'px';
             wrapper.style.position = 'absolute';
+            
+            // Применяем экранные координаты
+            wrapper.style.left = screenX + 'px';
+            wrapper.style.top = screenY + 'px'; 
+            wrapper.style.width = screenW + 'px';
+            wrapper.style.height = screenH + 'px';
 
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'student-field';
             input.dataset.fieldId = f.id;
+            if (studentAnswers[f.id] !== undefined) input.value = studentAnswers[f.id];
 
-            // ВОССТАНАВЛИВАЕМ значение из studentAnswers
-            if (studentAnswers[f.id] !== undefined) {
-                input.value = studentAnswers[f.id];
-            }
-
-            // Сохраняем в объект при вводе
-            input.addEventListener('input', (e) => {
-                studentAnswers[f.id] = e.target.value;
-                updateProgress();
-            });
-            input.addEventListener('blur', (e) => {
-                studentAnswers[f.id] = e.target.value.trim();
-                updateProgress();
-            });
+            input.addEventListener('input', e => studentAnswers[f.id] = e.target.value);
+            input.addEventListener('blur', e => studentAnswers[f.id] = e.target.value.trim());
 
             wrapper.appendChild(input);
             page.appendChild(wrapper);
