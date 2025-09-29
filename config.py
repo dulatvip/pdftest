@@ -1,43 +1,43 @@
 import os
-import json
-from google.oauth2.service_account import Credentials
-import gspread
-from config import Config # Импортируем ваши настройки
 
-# Имя ключа должно совпадать с тем, что вы задали в Replit Secrets
-SECRET_KEY_NAME = "GOOGLE_CREDENTIALS_JSON" 
+class Config:
+    DEBUG = True
+    SECRET_KEY = "super-secret-key"
 
-def authorize_google_sheets():
-    # 1. Получаем строку JSON из переменной окружения Replit
-    credentials_json_string = os.environ.get(SECRET_KEY_NAME) 
+    UPLOAD_FOLDER = 'uploads'
+    TEMPLATES_FOLDER = 'templates_json'
+    STATIC_FOLDER = 'static'
 
-    if not credentials_json_string:
-        print("СИСТЕМА АВТОРИЗАЦИИ ТРЕБУЕТ НАСТРОЙКИ! Секрет не найден.")
-        return None
+    SESSION_TIMEOUT_HOURS = 2  
 
-    try:
-        # 2. Парсим строку JSON в словарь Python
-        credentials_info = json.loads(credentials_json_string)
-        
-        # 3. Аутентификация через словарь
-        creds = Credentials.from_service_account_info(
-            credentials_info, 
-            scopes=Config.GOOGLE_SHEETS_SCOPES # Используем области из вашего config.py
-        )
-        
-        # 4. Создаем клиент gspread
-        client = gspread.authorize(creds)
-        return client
+    # 📂 Абсолютный путь до корня проекта
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    except Exception as e:
-        print(f"Ошибка при авторизации Google API: {e}")
-        return None
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+    TEMPLATES_FOLDER = os.path.join(BASE_DIR, "templates_json")
+    STATIC_FOLDER = os.path.join(BASE_DIR, "static")
 
-# Использование:
-# gsheet_client = authorize_google_sheets()
-# if gsheet_client:
-#     # Можно работать с таблицами
-#     sheet = gsheet_client.open_by_url(Config.USERS_SHEET_URL)
-# else:
-#     # Обработка ошибки
-#     pass
+    PDF_DPI = 200
+
+    GOOGLE_SHEETS_SCOPES = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
+
+    # 🔑 ссылка на Google Sheets
+    USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1yI_73HFTwXFuG2-2nwxqodoGCM0gDC6uDDp16t3aLa8/edit?gid=0#gid=0"
+
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+
+
+    @staticmethod
+    def create_directories():
+        import os
+        for folder in [
+            Config.UPLOAD_FOLDER, 
+            Config.TEMPLATES_FOLDER, 
+            Config.STATIC_FOLDER, 
+            "templates"
+        ]:os.makedirs(folder, exist_ok=True)
+
+   
