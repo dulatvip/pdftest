@@ -3,7 +3,7 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from flask import session, redirect, url_for, request # Импортируем для декоратора
-from config_0 import Config
+from config import Config
 from functools import wraps
 
 class AuthManager:
@@ -14,20 +14,55 @@ class AuthManager:
         self.client = None
         self.sheet = None
         
-        self.creds_path = Config.get_credentials_path()
-        if not os.path.exists(self.creds_path):
-            print("WARNING: credentials.json not found for AuthManager.")
+        # ❌ УДАЛЕНО: self.creds_path = Config.get_credentials_path()
+        # ❌ УДАЛЕНО: Проверка if not os.path.exists(self.creds_path):
+
+        # 1. Получаем учетные данные из переменных окружения
+        credentials_info = self._get_credentials_from_env()
+
+        if not credentials_info:
+            print("WARNING: Google API credentials (secrets) not found in environment variables.")
+            print("СИСТЕМА АВТОРИЗАЦИИ ТРЕБУЕТ НАСТРОЙКИ! Проверьте Replit App Secrets.")
             return
 
         try:
-            # Авторизация клиента
-            creds = Credentials.from_service_account_file(self.creds_path, scopes=Config.GOOGLE_SHEETS_SCOPES)
+            # 2. Авторизация клиента с помощью словаря данных
+            creds = Credentials.from_service_account_info(credentials_info, scopes=Config.GOOGLE_SHEETS_SCOPES)
             self.client = gspread.authorize(creds)
-            # Открытие таблицы (предполагаем, что данные в первом листе)
+            # 3. Открытие таблицы (предполагаем, что данные в первом листе)
             self.sheet = self.client.open_by_url(Config.USERS_SHEET_URL).sheet1
         except Exception as e:
             print(f"Error connecting to Google Sheets for Auth: {e}")
             self.client = None
+
+    def _get_credentials_from_env(self):
+        """Собирает информацию сервисного аккаунта из переменных окружения Replit Secrets."""
+        
+        # Проверяем наличие ключевого секрета (client_email), чтобы избежать лишней работы
+        if not os.environ.get("client_email"):
+            return None
+
+        # ВАЖНО: Заменяем \\n на \n в private_key, иначе ключ не сработает!
+        private_key = os.environ.get("private_key", "").replace('\\n', '\n')
+        
+        # Простая проверка, что ключ не пуст после замены
+        if not private_key or not os.environ.get("project_id"):
+             return None
+
+        # Собираем данные в словарь, используя имена переменных из Replit Secrets
+        return {
+            "type": "service_account",
+            "project_id": os.environ.get("project_id"),
+            "private_key_id": os.environ.get("private_key_id"),
+            "private_key": private_key,
+            "client_email": os.environ.get("client_email"),
+            "client_id": os.environ.get("client_id"),
+            "auth_uri": os.environ.get("auth_uri"),
+            "token_uri": os.environ.get("token_uri"),
+            "auth_provider_x509_cert_url": os.environ.get("auth_provider_x509_cert_url"),
+            "client_x509_cert_url": os.environ.get("client_x509_cert_url"),
+            "universe_domain": os.environ.get("universe_domain")
+        }
     
     def _fetch_users_data(self):
         """Получает данные пользователей из Google Таблицы."""
@@ -44,8 +79,9 @@ class AuthManager:
             return None
 
     def authenticate_user(self, login, password):
+        # ⚠️ Обновляем сообщение об ошибке, если клиент не был инициализирован
         if not self.client:
-            return {"success": False, "error": "Ошибка подключения к Google Sheets. Проверьте credentials.json."}
+            return {"success": False, "error": "Ошибка подключения к Google Sheets. Проверьте секреты Replit."}
 
         users_data = self._fetch_users_data()
         if users_data is None:
